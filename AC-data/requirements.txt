@@ -1,0 +1,3 @@
+#Optional: only for data updating
+#numpy
+#requests
