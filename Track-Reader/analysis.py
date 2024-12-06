@@ -1,6 +1,4 @@
 #%%
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -24,18 +22,18 @@ def to_mins(string):
 
 to_knots = lambda mps: mps / 0.5144
 
-starts= ["2022-06-26T10:51:00.000","2022-06-26T11:55:10.000","2022-06-26T12:38:30.000","2022-06-26T13:24:00.000","2022-06-26T14:00:00.000"]
-stops = ["2022-06-26T11:27:00.000","2022-06-26T12:21:15.000","2022-06-26T13:08:00.000","2022-06-26T13:47:00.000","2022-06-26T14:18:10.000"]
+starts= ["2024-06-08T10:00:00.000"]
+stops = ["2024-06-08T11:06:00.000"]
 
 
 for race,[start,stop] in enumerate(zip(starts,stops)):
 
-    if race!=4: continue
+    # if race!=4: continue
     print(race)
     print(start)
     print(stop)
     # select only the race
-    data = tr.get_data("activity/activity_9094378755.tcx")
+    data = tr.get_data("activity/carron2_08062024.gpx")
     data = tr.cut(data, start=start, stop=stop)
 
     # prepare the colormap
@@ -63,9 +61,10 @@ for race,[start,stop] in enumerate(zip(starts,stops)):
     # segments = np.concatenate([points[:-1], points[1:]], axis=1)
     segments = np.concatenate([points[:-2],points[1:-1],points[2:]], axis=1)
     TWD = np.mean(data.heading.values % 180)
-    TWD = -5
+    TWD = 55
     print("mean heading data", TWD)
-    TWA = np.where((data.heading.values - TWD) > 180., 360 - data.heading.values - TWD, data.heading.values - TWD)
+    TWA = np.where((data.heading.values - TWD) > 180., 360 - (data.heading.values - TWD), data.heading.values - TWD)
+    # TWA = data.heading.values - TWD 
     # print(TWA)
     fig, axs = plt.subplots()
     plt.subplots_adjust(bottom=0.15)
@@ -78,17 +77,18 @@ for race,[start,stop] in enumerate(zip(starts,stops)):
     lc = LineCollection(segments, cmap=cmap, zorder=1)
     # print(lc)
     # # Set the values used for colormapping
-    # lc.set_array(to_knots(data.speed))
+    lc.set_array(to_knots(data.speed))
     # lc.set_array(data.heading.values)
-    lc.set_array(abs(TWA))
+    # lc.set_array(abs(TWA))
     lc.set_linewidth(5)
     line = axs.add_collection(lc)
     # print(line)
 
     l, = axs.plot(data.longitude.values[0], data.latitude.values[0], 'ok', ms=10,
-                  label="Speed (knots) %.2f \n TWA (degrees)) %.2f" % (
+                  label="Speed (knots) %.2f\n TWA (degrees)) %.2f\n VMG (knots) %.2f" % (
                                 to_knots(data.speed.values[0]),
-                                abs(TWA[0])
+                                abs(TWA[0]),
+                                to_knots(data.speed.values[0])*np.cos(np.radians(TWA[0]))
                   ))
 
     racetime = to_mins(data.time.values[-1])-to_mins(data.time.values[0])
@@ -99,9 +99,10 @@ for race,[start,stop] in enumerate(zip(starts,stops)):
         idx = np.argmin(abs(t-val))
         l.set_xdata([data.longitude.values[idx]])
         l.set_ydata([data.latitude.values[idx]])
-        l.set_label("Speed (knots) %.2f \n TWA (degrees)) %.2f" % (
+        l.set_label("Speed (knots) %.2f\n TWA (degrees)) %.2f\n VMG (knots) %.2f" % (
             to_knots(data.speed.values[idx]),
-            abs(TWA[idx]))
+            abs(TWA[idx]),
+            to_knots(data.speed.values[idx])*np.cos(np.radians(TWA[idx])))
         )
         axs.legend(loc='upper right')
 
@@ -112,14 +113,19 @@ for race,[start,stop] in enumerate(zip(starts,stops)):
     sw = data[["latitude", "longitude"]].min().values.tolist()
     ne = data[["latitude", "longitude"]].max().values.tolist()
     length = 0.004
-    axs.arrow(np.mean(data.longitude),np.mean(data.latitude),
-              -length*np.sin(np.radians(TWD)),-length*np.cos(np.radians(TWD)),
-              width=0.0008,zorder=-1000,alpha=0.2)
+    # axs.arrow(np.mean(data.longitude)+0.005,np.mean(data.latitude),
+    #           -length*np.sin(np.radians(TWD)),-length*np.cos(np.radians(TWD)),
+    #           width=0.0008,zorder=-1000,alpha=0.2)
+    X,Y = np.meshgrid(np.linspace(sw[1],ne[1],10),np.linspace(sw[0],ne[0],10))
+    axs.barbs(X, Y, -15**np.ones_like(X)*np.sin(np.radians(TWD)),
+              -15*np.ones_like(X)*np.cos(np.radians(TWD)),
+                zorder=-1000,alpha=0.2)
     axs.set_xlim(sw[1],ne[1])
     axs.set_ylim(sw[0],ne[0])
     axs.set_aspect("equal","datalim")
     axs.legend(loc='upper right')
-    fig.colorbar(line, ax=axs, label="abs(TWA) (degrees)")
+    # fig.colorbar(line, ax=axs, label="abs(TWA) (degrees)")
+    fig.colorbar(line, ax=axs, label="Vb (knots)")
     plt.show()
     # set zoom bounsd
     # fg_map.fit_bounds([sw, ne]) 
@@ -131,4 +137,9 @@ for race,[start,stop] in enumerate(zip(starts,stops)):
     # print("Saving map to : "+fname)
     # fg_map.save(fname)
 
+# %%
+plt.plot(data.time.values, to_knots(data.speed.values))
+plt.ylim(0,max( to_knots(data.speed.values)))
+plt.xlabel("Time UTC")
+plt.ylabel("Boat speed (knots)")
 # %%
